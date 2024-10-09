@@ -62,7 +62,8 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 import matplotlib
-
+from flask import request, jsonify, session
+from sqlalchemy.orm.exc import NoResultFound
 import matplotlib.pyplot as plt
 
 # Set up logging
@@ -131,7 +132,7 @@ def set_insulin(row):
         return 'High'
 def preprocess_female_diabetes():
     global Diabetes_DS, transformer, scaler, gbc, model, upper, feature_names
-    Diabetes_DS = pd.read_csv(r'C:\Users\a6833\Documents\sam\server\diabetes for women.csv')
+    Diabetes_DS = pd.read_csv('diabetes for women.csv')
     Diabetes_DS[['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction', 'Age']] = Diabetes_DS[['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction', 'Age']].replace(0, np.nan)
     def median_target(var):
         temp = Diabetes_DS[Diabetes_DS[var].notnull()]
@@ -208,7 +209,7 @@ def predict():
 # Load and preprocess dataset for male diabetes detection
 def preprocess_male_diabetes():
     global Diabetes_DS_male, poly, scaler_male, lr, X_male
-    Diabetes_DS_male = pd.read_csv(r'C:\Users\a6833\Documents\sam\server\Diabetes_detection_for_M.csv')
+    Diabetes_DS_male = pd.read_csv('Diabetes_detection_for_M.csv')
     Diabetes_DS_male = pd.get_dummies(Diabetes_DS_male, drop_first=True)
     X_male = Diabetes_DS_male.drop(['Diabetes'], axis=1)
     y_male = Diabetes_DS_male['Diabetes']
@@ -249,7 +250,7 @@ proba_have_heart_disease = None
 def Heart_Disease_Detection(input_data_):
     global proba_have_heart_disease
     # Load the dataset
-    data = pd.read_csv(r'C:\Users\a6833\Documents\sam\server\diseaseheart\heart_disease_data.csv')
+    data = pd.read_csv('diseaseheart/heart_disease_data.csv')
     print(data.columns)
     # Ensure the dataset includes all 14 fields
     expected_columns = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal']
@@ -345,7 +346,7 @@ scaler_liver = None
 def train_liver_model():
     global gbm_model_liver, scaler_liver
     # Load the dataset
-    Liver_DS = pd.read_csv(r"C:\Users\a6833\Documents\sam\server\liver\Liver_disease_data.csv")
+    Liver_DS = pd.read_csv('liver/Liver_disease_data.csv')
     # Prepare features and target variable
     X = Liver_DS.drop(columns='Diagnosis', axis=1)
     Y = Liver_DS['Diagnosis']   
@@ -585,9 +586,6 @@ def send_email(to_email, subj, body_, attachment_path):
             server.send_message(msg)
     except Exception as e:
         print(f"Error sending email: {e}")
-
-from flask import request, jsonify, session
-from sqlalchemy.orm.exc import NoResultFound
 
 @app.route('/detect_breast_cancer', methods=['POST'])
 def detect_breast_cancer():
