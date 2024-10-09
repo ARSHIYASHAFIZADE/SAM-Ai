@@ -132,7 +132,7 @@ def set_insulin(row):
         return 'High'
 def preprocess_female_diabetes():
     global Diabetes_DS, transformer, scaler, gbc, model, upper, feature_names
-    Diabetes_DS = pd.read_csv('diabetes for women.csv')
+    Diabetes_DS = pd.read_csv('dfw.csv.csv')
     Diabetes_DS[['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction', 'Age']] = Diabetes_DS[['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction', 'Age']].replace(0, np.nan)
     def median_target(var):
         temp = Diabetes_DS[Diabetes_DS[var].notnull()]
@@ -209,7 +209,7 @@ def predict():
 # Load and preprocess dataset for male diabetes detection
 def preprocess_male_diabetes():
     global Diabetes_DS_male, poly, scaler_male, lr, X_male
-    Diabetes_DS_male = pd.read_csv('Diabetes_detection_for_M.csv')
+    Diabetes_DS_male = pd.read_csv('dfm.csv.csv')
     Diabetes_DS_male = pd.get_dummies(Diabetes_DS_male, drop_first=True)
     X_male = Diabetes_DS_male.drop(['Diabetes'], axis=1)
     y_male = Diabetes_DS_male['Diabetes']
