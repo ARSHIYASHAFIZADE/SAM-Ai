@@ -7,6 +7,7 @@ from config import ApplicationConfig
 import pandas as pd
 import numpy as np
 import logging
+import os
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, PolynomialFeatures
 from sklearn.impute import SimpleImputer
@@ -132,7 +133,7 @@ def set_insulin(row):
         return 'High'
 def preprocess_female_diabetes():
     global Diabetes_DS, transformer, scaler, gbc, model, upper, feature_names
-    Diabetes_DS = pd.read_csv('dfw.csv')
+    Diabetes_DS = pd.read_csv(os.path.join(os.getcwd(), 'dfw.csv'))
     Diabetes_DS[['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction', 'Age']] = Diabetes_DS[['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction', 'Age']].replace(0, np.nan)
     def median_target(var):
         temp = Diabetes_DS[Diabetes_DS[var].notnull()]
@@ -209,7 +210,7 @@ def predict():
 # Load and preprocess dataset for male diabetes detection
 def preprocess_male_diabetes():
     global Diabetes_DS_male, poly, scaler_male, lr, X_male
-    Diabetes_DS_male = pd.read_csv('dfm.csv')
+    Diabetes_DS_male = pd.read_csv(os.path.join(os.getcwd(), 'dfm.csv'))
     Diabetes_DS_male = pd.get_dummies(Diabetes_DS_male, drop_first=True)
     X_male = Diabetes_DS_male.drop(['Diabetes'], axis=1)
     y_male = Diabetes_DS_male['Diabetes']
@@ -250,7 +251,7 @@ proba_have_heart_disease = None
 def Heart_Disease_Detection(input_data_):
     global proba_have_heart_disease
     # Load the dataset
-    data = pd.read_csv('diseaseheart/heart_disease_data.csv')
+    data = pd.read_csv(os.path.join(os.getcwd(), 'diseaseheart/heart_disease_data.csv'))
     print(data.columns)
     # Ensure the dataset includes all 14 fields
     expected_columns = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal']
@@ -346,7 +347,7 @@ scaler_liver = None
 def train_liver_model():
     global gbm_model_liver, scaler_liver
     # Load the dataset
-    Liver_DS = pd.read_csv('liver/Liver_disease_data.csv')
+    Liver_DS = pd.read_csv(os.path.join(os.getcwd(), 'liver/Liver_disease_data.csv'))
     # Prepare features and target variable
     X = Liver_DS.drop(columns='Diagnosis', axis=1)
     Y = Liver_DS['Diagnosis']   
