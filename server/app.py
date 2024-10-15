@@ -1,71 +1,38 @@
-from flask import Flask, request, jsonify, session 
+from flask import Flask, request, jsonify, session
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS, cross_origin
 from flask_session import Session
+from flask_mail import Mail, Message
+from flask_sqlalchemy import SQLAlchemy
 from models import db, User
 from config import ApplicationConfig
 import pandas as pd
 import numpy as np
 import logging
 import os
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler, PolynomialFeatures
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, RobustScaler, OneHotEncoder, PolynomialFeatures
-from sklearn.model_selection import train_test_split as tts
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import LocalOutlierFactor
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.compose import ColumnTransformer
-import pandas as pd
-import numpy as np
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.preprocessing import OneHotEncoder, PolynomialFeatures, StandardScaler, RobustScaler
-from sklearn.model_selection import train_test_split as tts
-from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import LocalOutlierFactor
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from sklearn.datasets import load_breast_cancer
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split as tts
-from flask import Flask, request, jsonify, session
-from flask_mail import Mail, Message
-from flask_cors import CORS, cross_origin
-from flask_bcrypt import Bcrypt
-from flask_sqlalchemy import SQLAlchemy
-from flask_session import Session
-from sklearn.datasets import load_breast_cancer
-from sklearn.model_selection import train_test_split as tts
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import io
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-import matplotlib
-from flask import request, jsonify, session
 from sqlalchemy.orm.exc import NoResultFound
 import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, RobustScaler, PolynomialFeatures
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split as tts
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.compose import ColumnTransformer
+from sklearn.datasets import load_breast_cancer
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -121,59 +88,83 @@ def login_user():
 with app.app_context():
     db.create_all()
 # Load and preprocess dataset for female diabetes detection
-def set_insulin(row):
-    # Assign insulin score based on insulin levels (this is an example, adapt as needed)
-    if row['Insulin'] <= 30:
-        return 'Low'
-    elif row['Insulin'] <= 60:
-        return 'Normal'
-    elif row['Insulin'] <= 120:
-        return 'Overweight'
-    else:
-        return 'High'
 def preprocess_female_diabetes():
     global Diabetes_DS, transformer, scaler, gbc, model, upper, feature_names
-    Diabetes_DS = pd.read_csv(os.path.join(os.getcwd(), 'dfw.csv'))
+    
+    # Get the path from an environment variable
+
+    # Read the CSV file
+    Diabetes_DS = pd.read_csv('dfw.csv')
+    print("Current working directory:", Diabetes_DS)
+    # Replace 0 values with NaN for relevant columns
     Diabetes_DS[['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction', 'Age']] = Diabetes_DS[['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction', 'Age']].replace(0, np.nan)
+
+    # Function to get the median based on the target 'Outcome'
     def median_target(var):
         temp = Diabetes_DS[Diabetes_DS[var].notnull()]
         temp = temp[[var, 'Outcome']].groupby(['Outcome'])[[var]].median().reset_index()
         return temp
+
+    # Fill missing values with median based on the 'Outcome' column
     columns = Diabetes_DS.columns.drop("Outcome")
     for i in columns:
         Diabetes_DS.loc[(Diabetes_DS['Outcome'] == 0) & (Diabetes_DS[i].isnull()), i] = median_target(i)[i][0]
         Diabetes_DS.loc[(Diabetes_DS['Outcome'] == 1) & (Diabetes_DS[i].isnull()), i] = median_target(i)[i][1]
+
+    # Handle outliers in the Insulin column
     Q1 = Diabetes_DS.Insulin.quantile(0.25)
     Q3 = Diabetes_DS.Insulin.quantile(0.75)
     IQR = Q3 - Q1
     upper = Q3 + 1.5 * IQR
     Diabetes_DS.loc[Diabetes_DS['Insulin'] > upper, "Insulin"] = upper
+
+    # Use Local Outlier Factor to detect and remove outliers
     lof = LocalOutlierFactor(n_neighbors=10)
     Diabetes_DS_scores = lof.fit_predict(Diabetes_DS.drop('Outcome', axis=1))
     threshold = np.sort(lof.negative_outlier_factor_)[7]
     outliers = Diabetes_DS_scores > threshold
     Diabetes_DS = Diabetes_DS[outliers]
+
+    # Create new BMI categories
     NewBMI = ["Underweight", "Normal", "Overweight", "Obesity 1", "Obesity 2", "Obesity 3"]
     Diabetes_DS['NewBMI'] = pd.cut(Diabetes_DS['BMI'], bins=[-np.inf, 18.5, 24.9, 29.9, 34.9, 39.9, np.inf], labels=NewBMI)
-    Diabetes_DS['NewInsulinScore'] = Diabetes_DS.apply(set_insulin, axis=1)
+
+    # Create new Glucose categories
     NewGlucose = ["Low", "Normal", "Overweight", "High"]
     Diabetes_DS["NewGlucose"] = pd.cut(Diabetes_DS["Glucose"], bins=[-np.inf, 70, 99, 126, np.inf], labels=NewGlucose)
-    Diabetes_DS = pd.get_dummies(Diabetes_DS, columns=["NewBMI", "NewInsulinScore", "NewGlucose"], drop_first=True)
+
+    # One-hot encode the new categorical columns
+    Diabetes_DS = pd.get_dummies(Diabetes_DS, columns=["NewBMI", "NewGlucose"], drop_first=True)
+
+    # Prepare features (X) and target (y)
     X = Diabetes_DS.drop(['Outcome'], axis=1)
     y = Diabetes_DS['Outcome']
     feature_names = X.columns.tolist()
+
+    # Scale the features using RobustScaler
     transformer = RobustScaler().fit(X)
     X_scaled = transformer.transform(X)
     X_scaled = pd.DataFrame(X_scaled, columns=feature_names, index=X.index)
+
+    # Split the data into training and validation sets
     X_train, X_val, y_train, y_val = tts(X_scaled, y, test_size=0.2, random_state=0)
+
+    # Standardize the training data
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
+
+    # Train a Gradient Boosting Classifier
     gbc = GradientBoostingClassifier(learning_rate=0.1, loss='exponential', n_estimators=150)
     gbc.fit(X_train_scaled, y_train)
+
+    # Train a Logistic Regression model in a pipeline
     model = LogisticRegression(max_iter=1000)
     pipeline = make_pipeline(scaler, model)
-    model.fit(X_train_scaled, y_train)    
+    pipeline.fit(X_train_scaled, y_train)
+
 preprocess_female_diabetes()
+
+# Prediction endpoint for female diabetes detection
 # Prediction endpoint for female diabetes detection
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -182,35 +173,47 @@ def predict():
         if not input_data:
             return jsonify({'error': 'No data provided'}), 400  
         logger.info(f"Received input data: {input_data}")  
+        
         # Create DataFrame from input data
         input_df = pd.DataFrame([input_data])  
+        
         # Apply preprocessing steps to the input data
         input_df['NewBMI'] = pd.cut(input_df['BMI'], bins=[-np.inf, 18.5, 24.9, 29.9, 34.9, 39.9, np.inf], labels=["Underweight", "Normal", "Overweight", "Obesity 1", "Obesity 2", "Obesity 3"])
         input_df['NewInsulinScore'] = input_df.apply(set_insulin, axis=1)
         input_df["NewGlucose"] = pd.cut(input_df["Glucose"], bins=[-np.inf, 70, 99, 126, np.inf], labels=["Low", "Normal", "Overweight", "High"])  
+
         # Generate dummies for categorical features
         input_df = pd.get_dummies(input_df, columns=["NewBMI", "NewInsulinScore", "NewGlucose"], drop_first=True)  
+        
         # Reindex to match expected columns, ensuring correct order and filling missing columns with zeros
         input_df = input_df.reindex(columns=feature_names, fill_value=0)  
+        
         # Scale the input data
         input_df_scaled = transformer.transform(input_df)  
+        
         # Log the shapes of the data frames
         logger.info(f"Scaled input data shape: {input_df_scaled.shape}")  
-        # Make prediction and get the probability
-        prediction = gbc.predict(input_df_scaled)
-        prediction_prob = gbc.predict_proba(input_df_scaled)[0][1]  # Get the probability of the positive class (1)
-        logger.info(f"Prediction result: {int(prediction[0])}, Probability: {prediction_prob}")    
+        
+        # Make prediction (0 or 1)
+        prediction = gbc.predict(input_df_scaled)  # 0 or 1 (class label)
+        probability = model.predict_proba(input_data)
+        # Log the prediction result
+        logger.info(f"Prediction result: {int(prediction[0])}") 
+        
+        prob = probability[0][1] * 100  # Convert to percentage
+    
         return jsonify({
-            'prediction': int(prediction[0]), 
-            'probability': prediction_prob
+            'prediction': prediction,
+            'probability': round(prob, 2)  # Round for cleaner output
         })
     except Exception as e:
         logger.error(f"Error during prediction: {e}")
         return jsonify({'error': str(e)}), 500
+
 # Load and preprocess dataset for male diabetes detection
 def preprocess_male_diabetes():
     global Diabetes_DS_male, poly, scaler_male, lr, X_male
-    Diabetes_DS_male = pd.read_csv(os.path.join(os.getcwd(), 'dfm.csv'))
+    Diabetes_DS_male = pd.read_csv('dfm.csv')
     Diabetes_DS_male = pd.get_dummies(Diabetes_DS_male, drop_first=True)
     X_male = Diabetes_DS_male.drop(['Diabetes'], axis=1)
     y_male = Diabetes_DS_male['Diabetes']
@@ -251,7 +254,7 @@ proba_have_heart_disease = None
 def Heart_Disease_Detection(input_data_):
     global proba_have_heart_disease
     # Load the dataset
-    data = pd.read_csv(os.path.join(os.getcwd(), 'diseaseheart/heart_disease_data.csv'))
+    data = pd.read_csv(('diseaseheart/heart_disease_data.csv'))
     print(data.columns)
     # Ensure the dataset includes all 14 fields
     expected_columns = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal']
@@ -347,7 +350,7 @@ scaler_liver = None
 def train_liver_model():
     global gbm_model_liver, scaler_liver
     # Load the dataset
-    Liver_DS = pd.read_csv(os.path.join(os.getcwd(), 'liver/Liver_disease_data.csv'))
+    Liver_DS = pd.read_csv('liver/Liver_disease_data.csv')
     # Prepare features and target variable
     X = Liver_DS.drop(columns='Diagnosis', axis=1)
     Y = Liver_DS['Diagnosis']   
